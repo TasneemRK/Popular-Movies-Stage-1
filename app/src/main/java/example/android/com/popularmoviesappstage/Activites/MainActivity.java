@@ -3,12 +3,11 @@ package example.android.com.popularmoviesappstage.Activites;
 import android.content.Intent;
 import android.os.AsyncTask;
 import android.os.Bundle;
-import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.GridLayoutManager;
 import android.support.v7.widget.RecyclerView;
-import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.widget.Toast;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -19,13 +18,15 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
+import butterknife.BindView;
+import butterknife.ButterKnife;
 import example.android.com.popularmoviesappstage.Adapters.MoviesAdapter;
 import example.android.com.popularmoviesappstage.Models.Movie;
 import example.android.com.popularmoviesappstage.R;
 import example.android.com.popularmoviesappstage.Utils.Constant;
 import example.android.com.popularmoviesappstage.Utils.NetworkUtils;
 
-public class MainActivity extends AppCompatActivity implements MoviesAdapter.RecycleItemClick {
+public class MainActivity extends NetworkUtils implements MoviesAdapter.RecycleItemClick {
 
     public static final String RESULT_JSON = "results";
     public static final String ID_JSON = "id";
@@ -34,10 +35,13 @@ public class MainActivity extends AppCompatActivity implements MoviesAdapter.Rec
     public static final String OVERVIEW_JSON = "overview";
     public static final String DATE_JSON = "release_date";
     public static final String RATING_JSON = "vote_average";
+    public static final String MOVIE_OBJECT = "movie_object";
     public static final int GRID_SPANCOUNT = 2;
 
     List<Movie> movies = new ArrayList<>();
     MoviesAdapter adapter;
+
+    @BindView(R.id.moviesRecycleView)
     RecyclerView moviesRecycle;
 
     @Override
@@ -45,15 +49,19 @@ public class MainActivity extends AppCompatActivity implements MoviesAdapter.Rec
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        ButterKnife.bind(this);
 
-
-        moviesRecycle = findViewById(R.id.moviesRecycleView);
         adapter = new MoviesAdapter(this, movies, this);
         moviesRecycle.setAdapter(adapter);
         GridLayoutManager layoutManager = new GridLayoutManager(this, GRID_SPANCOUNT);
         moviesRecycle.setLayoutManager(layoutManager);
 
-        new GetMoviesAsyncTask().execute(Constant.ALL_MOIVES_API);
+        if (isOnline()) {
+            new GetMoviesAsyncTask().execute(Constant.ALL_MOIVES_API);
+        } else {
+            Toast.makeText(this, "you are not connected to the internet.", Toast.LENGTH_SHORT).show();
+        }
+
 
     }
 
@@ -68,12 +76,21 @@ public class MainActivity extends AppCompatActivity implements MoviesAdapter.Rec
         int id = item.getItemId();
         switch (id) {
             case R.id.popular_sort:
-                new GetMoviesAsyncTask().execute(Constant.SORT_BY_POPULARITY_API);
-                adapter.notifyDataSetChanged();
+                if (isOnline()) {
+                    new GetMoviesAsyncTask().execute(Constant.SORT_BY_POPULARITY_API);
+                    adapter.notifyDataSetChanged();
+                } else {
+                    Toast.makeText(this, "you are not connected to the internet.", Toast.LENGTH_SHORT).show();
+                }
+
                 break;
             case R.id.highestRate_sort:
-                new GetMoviesAsyncTask().execute(Constant.SORT_BY_TOP_RATES_API);
-                adapter.notifyDataSetChanged();
+                if (isOnline()) {
+                    new GetMoviesAsyncTask().execute(Constant.SORT_BY_TOP_RATES_API);
+                    adapter.notifyDataSetChanged();
+                } else {
+                    Toast.makeText(this, "you are not connected to the internet.", Toast.LENGTH_SHORT).show();
+                }
                 break;
 
         }
@@ -87,7 +104,7 @@ public class MainActivity extends AppCompatActivity implements MoviesAdapter.Rec
     }
 
 
-    public class GetMoviesAsyncTask extends AsyncTask<String, Void, List<Movie>> implements MoviesAdapter.RecycleItemClick{
+    public class GetMoviesAsyncTask extends AsyncTask<String, Void, List<Movie>> implements MoviesAdapter.RecycleItemClick {
 
         List<Movie> movies = new ArrayList<>();
 
@@ -97,22 +114,36 @@ public class MainActivity extends AppCompatActivity implements MoviesAdapter.Rec
                 return null;
             }
 
-            URL url = NetworkUtils.buildUrl(strings[0]);
+            URL url = buildUrl(strings[0]);
             try {
-                String result = NetworkUtils.getResponseFromHttpUrl(url);
+                String result = getResponseFromHttpUrl(url);
                 JSONObject jsonObject = new JSONObject(result);
                 JSONArray resultsArray = jsonObject.getJSONArray(RESULT_JSON);
                 for (int i = 0; i < resultsArray.length(); i++) {
                     JSONObject resultJson = resultsArray.getJSONObject(i);
-                    Movie movie = new Movie();
-                    movie.setId(resultJson.getInt(ID_JSON));
-                    movie.setOriginal_title(resultJson.getString(TITLE_JSON));
-                    movie.setImage(Constant.IMAGE_URL+resultJson.getString(IMAGE_JSON));
 
-                    movie.setOverview(resultJson.getString(OVERVIEW_JSON));
-                    movie.setRelease_date(resultJson.getString(DATE_JSON));
-                    movie.setRating(resultJson.getDouble(RATING_JSON)+"");
+                    Movie movie = new Movie();
+                    if (resultJson.has(ID_JSON)) {
+                        movie.setId(resultJson.getInt(ID_JSON));
+                    }
+                    if (resultJson.has(TITLE_JSON)) {
+                        movie.setOriginal_title(resultJson.getString(TITLE_JSON));
+                    }
+                    if (resultJson.has(IMAGE_JSON)) {
+                        movie.setImage(Constant.IMAGE_URL + resultJson.getString(IMAGE_JSON));
+                    }
+                    if (resultJson.has(OVERVIEW_JSON)) {
+                        movie.setOverview(resultJson.getString(OVERVIEW_JSON));
+                    }
+                    if (resultJson.has(DATE_JSON)) {
+                        movie.setRelease_date(resultJson.getString(DATE_JSON));
+                    }
+                    if (resultJson.has(RATING_JSON)) {
+                        movie.setRating(resultJson.getDouble(RATING_JSON) + "");
+                    }
+
                     movies.add(movie);
+
                 }
 
                 return movies;
@@ -134,11 +165,7 @@ public class MainActivity extends AppCompatActivity implements MoviesAdapter.Rec
         @Override
         public void onItemClickListener(int clickIndex) {
             Intent intent = new Intent(MainActivity.this, DetailsActivity.class);
-            intent.putExtra(TITLE_JSON,movies.get(clickIndex).getOriginal_title());
-            intent.putExtra(IMAGE_JSON,movies.get(clickIndex).getImage());
-            intent.putExtra(OVERVIEW_JSON,movies.get(clickIndex).getOverview());
-            intent.putExtra(RATING_JSON,movies.get(clickIndex).getRating());
-            intent.putExtra(DATE_JSON,movies.get(clickIndex).getRelease_date());
+            intent.putExtra(MOVIE_OBJECT,movies.get(clickIndex));
             startActivity(intent);
         }
     }

@@ -1,6 +1,10 @@
 package example.android.com.popularmoviesappstage.Utils;
 
+import android.content.Context;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.net.Uri;
+import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 
 import java.io.IOException;
@@ -12,10 +16,9 @@ import java.util.Scanner;
 
 import static android.content.ContentValues.TAG;
 
-public class NetworkUtils {
+public class NetworkUtils extends AppCompatActivity{
 
     public static URL buildUrl(String urlString) {
-        // COMPLETED (1) Fix this method to return the URL used to query Open Weather Map's API
         Uri builtUri = Uri.parse(urlString);
         URL url = null;
         try {
@@ -23,7 +26,6 @@ public class NetworkUtils {
         } catch (MalformedURLException e) {
             e.printStackTrace();
         }
-        Log.v(TAG, "Built URI " + url);
         return url;
     }
     public static String getResponseFromHttpUrl(URL url) throws IOException {
@@ -43,6 +45,12 @@ public class NetworkUtils {
         } finally {
             urlConnection.disconnect();
         }
+    }
+
+    public  boolean isOnline() {
+        ConnectivityManager cm = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo netInfo = cm.getActiveNetworkInfo();
+        return netInfo != null && netInfo.isConnected();
     }
 
 }
